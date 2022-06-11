@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport" />
+    <!-- Author -->
+    <title>Jan Procházka</title>
+    <link href="humans.txt" rel="author" />
+    <!-- Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Stylesheets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link href="/css/main.css" rel="stylesheet" type="text/css" />
+    <link href="/css/highlight.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body>
+    <header class="container row center">
+      <a href="https://jan-prochazka.eu/">
+        <img class="greyscale" src="/icons/512.png" width="64px" height="64px" />
+      </a>
+      <a class="link" href="/">Index</a>
+      <a class="link" href="https://github.com/jprochazk">GitHub</a>
+    </header>
+    <main>
+      <div class="title">
+        <h1 class="heading">Why the React VDOM is pure overhead</h1>
+        <h3 class="subheading">...and how Svelte can help</h3>
+        <span class="date">12-6-2022</span>
+      </div>
+      <article><p>Frontend developers are expected to create beautiful, rich, accessible, and smooth user experiences. These expectations come with their fair share of issues. The biggest one is complexity: a large web app can be tens or hundreds of thousands of lines of code. Managing this complexity is a huge burden, which is amplified by the nature of the web, being ever-changing and requiring each developer to think a lot about which web browser features they are even allowed to use in order to support the maximum number of users.</p>
+<p>In recent years, there has been a movement towards improving developer experience (DX) in hopes of lessening that burden. Various tools have attempted to solve DX by making it easier to manipulate web pages through creating, deleting, and updating HTML elements, such as buttons, inputs, and text. Web browsers use a representation of HTML called the document object model (DOM), which is a tree-like structure that can be manipulated by JavaScript (JS) code in order to dynamically update web pages after they’ve been loaded.</p>
+<p>These tools are called JS frameworks, and they work by abstracting away the DOM manipulation code, in a way similar to how the C programming language abstracts away Assembly, or how what-you-see-is-what-you-get (WYSIWYG) editors like Microsoft Word abstract away the formatting information of rich text documents.</p>
+<p>The basic idea is to give the developer the ability to create DOM nodes, and update them after any of the following events happen:</p>
+<ul>
+<li>A user interacts with the page</li>
+<li>A network request finishes</li>
+<li>A timer fires a tick</li>
+</ul>
+<p>The methods these frameworks use for this abstraction are varied, but there are two popular approaches:</p>
+<ul>
+<li>Using a virtual DOM (VDOM) and diffing</li>
+<li>Using fine-grained reactivity</li>
+</ul>
+<h3 id="vdom--diffing">VDOM + diffing</h3>
+<p>VDOM + diffing works by making the developer work with &quot;fake&quot; or &quot;synthetic&quot; versions of DOM nodes, which are much faster to build and update than the real DOM.</p>
+<p>After the developer updates the VDOM, the result is compared against the previous version of itself, through a process known as diffing, in which the framework tries to find the minimal set of operations required to apply the updates to the real DOM. This can drastically reduce the amount of work that the browser has to do in order to update the page.</p>
+<p>Or, that&#39;s the idea, at least. In practice, the amount of work done is actually drastically increased, due to:</p>
+<ul>
+<li>Keeping the VDOM in sync with the real DOM</li>
+<li>Discarding and re-creating large chunks of the VDOM</li>
+<li>Running a lot of complex rendering code very often</li>
+</ul>
+<p>Frameworks which use the VDOM + diffing approach can often be seen creating a lot of temporary objects. This causes a lot of unnecessary garbage collector (GC) pressure, because the GC has to do more work in order to reclaim the memory used for those temporary objects.</p>
+<p>Here’s what a typical initial render of something like Jira’s project board looks like in the Chrome DevTools profiler:</p>
+<p><img src="./gc-graph.png" alt="screenshot of the chrome devtools profiler highlighting two large GC cycles"></p>
+<p>Those two GC cycles alone took nearly 100ms, and this screenshot shows only a tiny fraction of the 6s it took to finish the initial render. The minor GC is responsible for collecting those “quickly discarded” objects, such as the re-rendered parts of the VDOM, or all of the closures and dependency arrays created inside of functional components. The fact that it takes this long goes to show just how many objects the application is creating and immediately throwing away. This may cause the application to feel slow, unresponsive, or janky.</p>
+<p>In essence, using a VDOM + diffing is a very brute-force approach to building UIs (tear the whole thing down and rebuild it from scratch any time anything changes). The trade-off is that it&#39;s much easier to reason about... Or is it? Introducing fine-grained reactivity.</p>
+<h3 id="fine-grained-reactivity">Fine-grained reactivity</h3>
+<p>For a long time, this was the de facto standard method for developing web applications, using frameworks like jQuery, Knockout.js, or even just plain JS without a framework. It works by creating and updating real DOM nodes, but at a very fine-grained level. What this means is that you &quot;surgically&quot; update only the parts of the DOM which are affected by any events only when those events fire, instead of &quot;throwing away&quot; large parts of the DOM (or VDOM), and re-rendering those parts from scratch.</p>
+<p>One often-cited problem with fine-grained reactivity is how verbose it is. That is indeed true - VDOM code and &quot;raw&quot; JS DOM manipulation code are night and day in terms of brevity, especially when the former is used with a syntactic superset of HTML and JS called JSX.</p>
+<p>It&#39;s also simply a lot harder to write code using this method, because it doesn&#39;t cleanly map to how people usually visualize their app’s tree of HTML elements. You&#39;ll have tons of loose, often duplicated, very verbose code strewn about in various event listener callbacks or random functions, and some at the top-level, making it harder to understand what is actually happening.</p>
+<p>To give a concrete example, below is the code for a simple app which has a single text input, and a single text node. The text node&#39;s contents are kept in sync with the input.</p>
+<p>Here&#39;s what it would look like in plain JS:</p>
+<pre><code class="language-ts"><span class="hljs-keyword">const</span> text = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">createElement</span>(<span class="hljs-string">&quot;span&quot;</span>);
+
+<span class="hljs-keyword">const</span> input = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">createElement</span>(<span class="hljs-string">&quot;input&quot;</span>);
+input.<span class="hljs-property">type</span> = <span class="hljs-string">&quot;text&quot;</span>;
+input.<span class="hljs-title function_">addEventListener</span>(<span class="hljs-string">&quot;input&quot;</span>, <span class="hljs-function">() =&gt;</span> (text.<span class="hljs-property">textContent</span> = input.<span class="hljs-property">value</span>));
+
+<span class="hljs-variable language_">document</span>.<span class="hljs-property">body</span>.<span class="hljs-title function_">appendChild</span>(input);
+<span class="hljs-variable language_">document</span>.<span class="hljs-property">body</span>.<span class="hljs-title function_">appendChild</span>(text);
+</code></pre>
+<p>This code lacks structure, and there isn&#39;t a good way to improve it. As your app grows, it would very quickly become unmaintainable. This is what it would look like in React:</p>
+<pre><code class="language-jsx"><span class="hljs-keyword">function</span> <span class="hljs-title function_">App</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-keyword">const</span> [value, setValue] = <span class="hljs-title function_">useState</span>(<span class="hljs-string">&quot;&quot;</span>);
+
+  <span class="hljs-keyword">return</span> (
+    <span class="language-xml"><span class="hljs-tag">&lt;&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">input</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text&quot;</span> <span class="hljs-attr">onInput</span>=<span class="hljs-string">{(event)</span> =&gt;</span> setValue(event.target.value)} /&gt;
+      <span class="hljs-tag">&lt;<span class="hljs-name">span</span>&gt;</span>{value}<span class="hljs-tag">&lt;/<span class="hljs-name">span</span>&gt;</span>
+    <span class="hljs-tag">&lt;/&gt;</span></span>
+  );
+}
+</code></pre>
+<p>It looks like HTML with a bit of JS thrown in, but the structure is clear. In this model, it&#39;s very easy to abstract away parts of your app, such as custom inputs, buttons, tables, etc. React is a clear winner here, and this is one of the main reasons for its popularity.</p>
+<p>However, React uses the VDOM + diffing approach, and the aforementioned problems still exist. Every time you type a character into the input, React has to re-run the entire body of the <code>App</code> function - which means recreating the top-level fragment (<code>&lt;&gt;...&lt;/&gt;</code>) element, the <code>input</code> and <code>span</code>, the <code>onInput</code> callback, and the temporary array returned from <code>useState</code>. After doing all of that work, it will perform a diff and realise that only the content of the <code>span</code> need to be updated, and it will discard everything else.</p>
+<p>There are a lot of rules that you have to keep in mind when writing code in something like React, and these rules are &quot;made up&quot; in the sense that they are simply attempting to solve problems which React created (in particular, the re-rendering problem). There are a lot of concepts that you have to understand in order to be productive in React, such as synthetic events, memoization, hook dependencies, effects... The list goes on.</p>
+<p>As your app grows, it is certainly more maintainable than plain JS code, but you are paying a huge price in performance which you have to spend a lot of time and effort optimizing, and eventually also in the cognitive load of understanding any complex apps written this way. The plain JS code does not have those performance problems, as the only work it does is updating the <code>textContent</code> value of the span each time you type a character into the input. It does not create any temporary objects, and it doesn&#39;t perform an often expensive diff.</p>
+<p>See for example the <a href="https://krausest.github.io/js-framework-benchmark/current.html">js-framework-benchmark</a>, and select <code>vanillajs</code> and <code>React</code> under the <code>Which frameworks</code> dropdown. Disclaimer: It is a microbenchmark, and it does <em>not</em> tell the full story of how those frameworks behave in the real world, but it does show one part of it, so it remains a useful indicator.</p>
+<p>While the plain JS example is (almost) as close as you can get to peak performance, it is extremely verbose, so there is no way anyone could use it in large, complex apps, and remain productive... But what if we could have our cake and eat it too?</p>
+<h3 id="introducing-svelte">Introducing Svelte</h3>
+<pre><code class="language-svelte"><span class="language-xml"><span class="hljs-tag">&lt;<span class="hljs-name">script</span>&gt;</span></span><span class="language-javascript">
+  <span class="hljs-keyword">let</span> value = <span class="hljs-string">&#x27;&#x27;</span>
+</span><span class="language-xml"><span class="hljs-tag">&lt;/<span class="hljs-name">script</span>&gt;</span>
+
+<span class="hljs-tag">&lt;<span class="hljs-name">input</span>
+  <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text&quot;</span>
+  <span class="hljs-attr">on:input</span>=</span></span><span class="language-javascript">{<span class="hljs-function">(<span class="hljs-params">event</span>) =&gt;</span> value = event.<span class="hljs-property">target</span>.<span class="hljs-property">value</span>}</span><span class="language-xml"><span class="hljs-tag">
+/&gt;</span>
+<span class="hljs-tag">&lt;<span class="hljs-name">span</span>&gt;</span></span><span class="language-javascript">{value}</span><span class="language-xml"><span class="hljs-tag">&lt;/<span class="hljs-name">span</span>&gt;</span></span>
+</code></pre>
+<p>This works the exact same way as the previous two examples. It looks similar to React, except that our markup is no longer wrapped in a function, and we have a new <code>script</code> tag with a single variable inside of it. Each time we assign a new value to <code>value</code>, the <code>span</code> element&#39;s contents will update. It is performing basically the exact same work as the plain JS example, but it is as terse as the React example.</p>
+<p>Svelte does not use a VDOM, and instead employs a compiler. The compiler converts the above code into what is in essence the equivalent of the plain JS example. When the component is rendered for the first time, the &quot;body&quot; of that script runs once, and never again. Assigning to a variable will cause that variable to be &quot;invalidated&quot;, which will cause all of its dependents to update - in this case, that&#39;s the <code>span</code> element.</p>
+<p>Here&#39;s a talk by Rich Harris (Svelte&#39;s creator) that delves a bit further into these ideas: <a href="https://www.youtube.com/watch?v=AdNJ3fydeao">Rich Harris - Rethinking reactivity</a></p>
+<p>The result is that Svelte gets to keep all the good parts of React, and none of its drawbacks. In my personal experience, after using both for a long time, the learning curves of Svelte and React look something like this:</p>
+<p><img src="./learning-curve.png" alt="a grid-less graph showing one nearly flat curve for Svelte, and a steep curve for React"></p>
+<p>React starts out simple, but quickly gets more complex as you have to learn about all of the concepts it introduces in order to satisfy the more advanced use-cases.</p>
+<p>Svelte starts simple, and stays simple. This doesn’t mean it can’t satisfy those same advanced use-cases - it’s the opposite, in fact.</p>
+<p>Let’s look at a different, slightly more complex example. We’ll create a counter, and then display the <a href="https://en.wikipedia.org/wiki/Factorial">factorial</a> of the counter’s value:</p>
+<pre><code class="language-jsx"><span class="hljs-keyword">function</span> <span class="hljs-title function_">FactorialCounter</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-keyword">const</span> [number, setNumber] = <span class="hljs-title function_">useState</span>(<span class="hljs-number">0</span>);
+  <span class="hljs-keyword">const</span> factorial = <span class="hljs-title function_">calculateFactorial</span>(number);
+
+  <span class="hljs-keyword">return</span> (
+    <span class="language-xml"><span class="hljs-tag">&lt;&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">onClick</span>=<span class="hljs-string">{()</span> =&gt;</span> setNumber(number + 1)}&gt;+<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">onClick</span>=<span class="hljs-string">{()</span> =&gt;</span> setNumber(number - 1)}&gt;-<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">pre</span>&gt;</span>
+        {number}! = {factorial}
+      <span class="hljs-tag">&lt;/<span class="hljs-name">pre</span>&gt;</span>
+    <span class="hljs-tag">&lt;/&gt;</span></span>
+  );
+}
+</code></pre>
+<p>Whenever the value changes, the factorial is re-calculated. Looks good… but if we put this component inside our <code>&lt;App /&gt;</code> in the previous example, we’ll find that it re-renders every time <code>App</code> re-renders. This may not be a problem at first, but as you keep increasing the value of the counter, the calculation becomes more and more expensive. At some point a single re-render of the <code>App</code> component can cause a noticeable stutter, even though it may not even result in a visible difference.</p>
+<p>The problem is solved using memoization:</p>
+<pre><code class="language-jsx"><span class="hljs-keyword">function</span> <span class="hljs-title function_">FactorialCounter</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-keyword">const</span> [number, setNumber] = <span class="hljs-title function_">useState</span>(<span class="hljs-number">0</span>);
+  <span class="hljs-keyword">const</span> factorial = <span class="hljs-title function_">useMemo</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">calculateFactorial</span>(number), [number]);
+
+  <span class="hljs-keyword">return</span> (
+    <span class="language-xml"><span class="hljs-tag">&lt;&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">onClick</span>=<span class="hljs-string">{()</span> =&gt;</span> setNumber(number + 1)}&gt;+<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">onClick</span>=<span class="hljs-string">{()</span> =&gt;</span> setNumber(number - 1)}&gt;-<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">pre</span>&gt;</span>
+        {number}! = {factorial}
+      <span class="hljs-tag">&lt;/<span class="hljs-name">pre</span>&gt;</span>
+    <span class="hljs-tag">&lt;/&gt;</span></span>
+  );
+}
+</code></pre>
+<p>Now the <code>factorial</code> will only be re-calculated whenever <code>number</code> changes, which means that re-renders of <code>App</code> will not cause it to run that potentially expensive calculation. This is a very common problem, but it isn’t unique to React, right?</p>
+<p>While it’s true that Svelte can’t help you calculate a factorial faster, it instead takes a different approach to solving the problem, one that requires significantly less work from the developer. Here’s how the memoized example would look like in Svelte:</p>
+<pre><code class="language-svelte"><span class="language-xml"><span class="hljs-tag">&lt;<span class="hljs-name">script</span>&gt;</span></span><span class="language-javascript">
+  <span class="hljs-keyword">let</span> number = <span class="hljs-number">0</span>
+</span><span class="hljs-keyword">  $: </span><span class="language-javascript">factorial = <span class="hljs-title function_">calculateFactorial</span>(number)
+</span><span class="language-xml"><span class="hljs-tag">&lt;/<span class="hljs-name">script</span>&gt;</span>
+
+<span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">on:click</span>=</span></span><span class="language-javascript">{<span class="hljs-function">() =&gt;</span> number += <span class="hljs-number">1</span>}</span><span class="language-xml"><span class="hljs-tag">&gt;</span>+<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+<span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">on:click</span>=</span></span><span class="language-javascript">{<span class="hljs-function">() =&gt;</span> number -= <span class="hljs-number">1</span>}</span><span class="language-xml"><span class="hljs-tag">&gt;</span>-<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+<span class="hljs-tag">&lt;<span class="hljs-name">pre</span>&gt;</span></span><span class="language-javascript">{number}</span><span class="language-xml">! = </span><span class="language-javascript">{factorial}</span><span class="language-xml"><span class="hljs-tag">&lt;/<span class="hljs-name">pre</span>&gt;</span></span>
+</code></pre>
+<p>The <code>$:</code> syntax is <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/label">valid JavaScript</a>, which Svelte re-purposes for creating <a href="https://svelte.dev/tutorial/reactive-declarations">reactive statements</a>. Notice that there is no dependency array. Instead of memoization, Svelte uses the concept of <em>derived state</em>. Where in React you have to explicitly think about what <code>factorial</code> depends on, which you can easily get wrong (and ruin your app’s performance), Svelte updates the value of <code>factorial</code> for you whenever any of the reactive values it depends on change. <code>number</code> is already reactive (as we can see in the example with a single input), so changing it will trigger an update to <code>factorial</code>. It’s almost as if Svelte gives you memoization for free.</p>
+<p>You can play around with the Svelte code <a href="https://svelte.dev/repl/a12856781550455f8ac24594da2ec42f?version=3.48.0">in the REPL</a>.</p>
+<p>At this point I’d recommend going through the <a href="https://svelte.dev/tutorial/basics">official Svelte tutorial</a>, which introduces every single feature of Svelte, but takes less than 30 minutes to get through. I strongly believe that Svelte&#39;s learning curve in the graph above will make a lot more sense once you try it out.</p>
+<h3 id="ecosystem">Ecosystem</h3>
+<p>React can’t do some of the things that Svelte can do out of the box, such as complex transitions, scoped styles, and global data stores. React not including this functionality in its core is both a blessing and a curse, as by providing only the bare minimum, it becomes very flexible, but in return, it forces developers to use a lot of third-party libraries. These libraries have to be kept up-to-date as React itself updates, but you’re often blocked from using the latest and greatest of React as you wait for your dependencies to release a new version.</p>
+<p>That’s the apparent trade-off: By using more dependencies, you’re increasing the maintenance burden, but you’re able to swap the dependencies out for other ones as you see fit… But do you really have to accept this trade-off? What if React included this functionality in its core, but still allowed you to swap them out as you see fit?</p>
+<p>This is exactly how Svelte works. It is also very minimal in its core, but it comes with a few “built-in” packages to make your life easier. They aren’t separate dependencies, so they also don’t need to be kept up to date separately. You can still swap them out as you see fit. Svelte is a fully featured, batteries-included, but also very unopinionated framework.</p>
+<p>Speaking of third-party libraries… Svelte is not nearly as popular as React, which means its ecosystem of libraries and tools is also going to be smaller. But how small is it, really? Is it even viable? Let’s look at some of the tools and libraries we use in React day-to-day, and see if Svelte has an equivalent, or if we’re out of luck:</p>
+<ul>
+<li>Build - Svelte plugins exist for every build tool in existence.</li>
+<li>Devtools - <a href="https://github.com/RedHatter/svelte-devtools">svelte-devtools</a> is unmaintained and broken, but there is a <a href="https://github.com/RedHatter/svelte-devtools/pull/70">pull request</a> with a (+1/-1) fix that people are reporting success on. We can fork it, merge the PR, and continue using it.</li>
+<li>Routing - There are many solutions here, such as <a href="https://github.com/mefechoel/svelte-navigator">svelte-navigator</a>, <a href="https://github.com/ItalyPaleAle/svelte-spa-router">svelte-spa-router</a>, and the meta-framework developed by the Svelte core team, <a href="https://kit.svelte.dev/">SvelteKit</a>, which uses Next.js-like filesystem-based routing.</li>
+<li>Tables - <a href="https://github.com/dasDaniel/svelte-table">svelte-table</a> exists, and it&#39;s probably a little too basic for advanced use-cases, because it doesn&#39;t support virtualization. For that, there&#39;s <a href="https://github.com/skayo/svelte-tiny-virtual-list">svelte-tiny-virtual-list</a>.</li>
+<li>Selects - <a href="https://github.com/rob-balfre/svelte-select">svelte-select</a> probably has all the functionality you could need, and is well maintained.</li>
+<li>Icons - <a href="https://github.com/yukipastelcat/svelte-fontawesome">svelte-fontawesome</a> or <a href="https://github.com/Cweili/svelte-fa">svelte-fa</a> for FontAwesome, <a href="https://github.com/jprochazk/svelte-material-icons">svelte-material-icons</a> for Material (disclaimer: my own library), and much more. You can easily find a wrapper for your favorite set of icons as the top result on Google.</li>
+<li>Component libraries - there are plenty of options, such as (but not limited to) <a href="https://github.com/bestguy/sveltestrap">sveltestrap</a> (Bootstrap), <a href="https://github.com/hperrin/svelte-material-ui">svelte-material-ui</a> (Material UI), or <a href="https://github.com/carbon-design-system/carbon-components-svelte">carbon-components-svelte</a> (IBM’s Carbon), and many more.</li>
+<li>Code editors - these are generally framework-agnostic (codemirror, monaco, ace), and easy to wrap up in your own component.</li>
+</ul>
+<p>I also recommend checking out <a href="https://github.com/TheComputerM/awesome-svelte">awesome-svelte</a>. All in all, there are some rough edges, but it’s more than usable.</p>
+<p>What about hiring potential? Are there enough Svelte devs available for hire? Well, if you&#39;re a fully remote company hiring in any US or EU timezone, you will have absolutely no problem finding candidates. Checkout <code>#jobs</code> in the <a href="https://t.co/bDvUqAxQmS">official Discord server</a> and <a href="https://sveltejobs.dev/">sveltejobs.dev</a>. You can also try to look for communities for your specific language where Svelte devs congregate, for my country (Czechia), that&#39;d be the <a href="https://discord.gg/RhwVpaSDPk">CZ/SK community Discord server</a>.</p>
+<p>Note that you don&#39;t actually have to hire <em>Svelte</em> devs - you can just hire <em>web</em> devs, and teach them Svelte! Because Svelte has no crazy gotchas that only seasoned developers are capable of avoiding, it&#39;s a viable approach, and will allow you to cast a much wider net for potential hires.</p>
+<h3 id="conclusion">Conclusion</h3>
+<p>While it <em>is</em> true that I am biased (because I love Svelte), I didn&#39;t mention any downsides because I had a hard time finding any. Let&#39;s instead take a look at some of the most common criticisms of Svelte:</p>
+<blockquote>
+<p>It&#39;s too magical.</p>
+</blockquote>
+<p>And React isn&#39;t? Why don’t people find it strange that your functions re-run automatically, when in non-React code (which is the majority of all code) they only run when you call them, or explicitly attach them to some event or timeout? Or that you can pull state out of thin air in a function’s local scope, <a href="https://reactjs.org/docs/hooks-rules.html">except for when you can&#39;t</a>? In comparison to the magic of React, Svelte is as straightforward as it gets. It <a href="https://svelte.dev/repl/a12856781550455f8ac24594da2ec42f?version=3.48.0">compiles to somewhat readable JavaScript</a> (available under the <code>JS output</code> tab on the right), and the behavior becomes clear after a bit of twiddling around.</p>
+<blockquote>
+<p>It doesn&#39;t scale.</p>
+</blockquote>
+<p>It does. There are tech giants using it successfully, such as <a href="https://github.com/carbon-design-system/carbon-components-svelte">IBM</a>, or <a href="https://twitter.com/sveltesociety/status/1410259330998341636?lang=en">Square</a>.</p>
+<p>There is an actual point to be made here, though. Svelte seems to have some problems <a href="https://github.com/sveltejs/svelte/issues/2546">scaling in bundle size</a> - it starts out very small, just under 5kB for a hello-world app due to not bundling a large runtime (compared to React at nearly 50kB), but the compiled output of Svelte components is generally a little bit larger than that of React components, so at some point, you’ll end up with a larger total bundle size than you’d have with a React app. Putting your entire app into a single bundle is almost never a good idea, so this isn’t a problem in practice thanks to code splitting.</p>
+<p>That being said, the Svelte developers have taken the concerns of the community into account, and <a href="https://youtu.be/uQntFkK8Z54?t=1020">have some ideas in store</a> for the next iteration of Svelte that would end up removing the issue completely. As a side note, I think this speaks volumes about how Svelte is truly community-driven, which is an excellent property to have.</p>
+<blockquote>
+<p>It&#39;s too immature.</p>
+</blockquote>
+<p>It was probably good enough to use the moment it <a href="https://svelte.dev/blog/svelte-and-typescript">introduced TypeScript support back in July 2020</a>. Rich Harris (Svelte’s creator) was recently <a href="https://vercel.com/blog/vercel-welcomes-rich-harris-creator-of-svelte">hired by Vercel</a> to work on it full time, so the framework has a solid foundation, and solid backing. It is sufficiently mature now, and I hope I&#39;ve made a good enough case for why.</p>
+<p>Of course, many alternative frameworks exist, and some of them are really nice:</p>
+<ul>
+<li><a href="https://www.infernojs.org/">Inferno</a> is an excellent implementation of the VDOM + diffing approach, and does great in benchmarks, but its adherence to React compatibility means it has the same usability problems as React.</li>
+<li><a href="https://lit.dev/">Lit</a> goes in a completely different direction and makes it easy to build <a href="https://developer.mozilla.org/en-US/docs/Web/Web_Components">Web Components</a>, which have the benefit of being (almost) framework-agnostic.</li>
+<li><a href="https://www.solidjs.com/">Solid</a> takes the fine-grained reactivity approach to the extreme. It’s still fairly young, and the ecosystem is small, otherwise it’d probably end up being the top choice.</li>
+</ul>
+<p>All things considered, Svelte still wins in my book. It has the perfect combination of performance, usability, stability, and maturity.</p>
+<p>I hope I’ve illustrated the benefits of Svelte well enough to make it worth considering. If you haven&#39;t already, I urge you to check out the <a href="https://svelte.dev/tutorial/basics">Svelte tutorial</a>.</p>
+</article>
+    </main>
+  </body>
+</html>
