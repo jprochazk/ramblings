@@ -1,0 +1,19 @@
+{
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node dev.js"
+  },
+  "devDependencies": {
+    "front-matter": "^4.0.2",
+    "fs-extra": "^10.1.0",
+    "handlebars": "^4.7.7",
+    "highlight.js": "^11.5.1",
+    "highlightjs-svelte": "^1.0.6",
+    "http-server": "^14.1.1",
+    "marked": "^4.0.16",
+    "node-watch": "^0.7.3",
+    "ws": "^8.8.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport" />
+    <!-- Author -->
+    <title>Jan Procházka</title>
+    <link href="humans.txt" rel="author" />
+    <!-- Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Stylesheets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link href="/css/main.css" rel="stylesheet" type="text/css" />
+    <link href="/css/highlight.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body>
+    <header class="container row center">
+      <a href="https://jan-prochazka.eu/">
+        <img class="greyscale" src="/icons/512.png" width="64px" height="64px" />
+      </a>
+      <a class="link" href="/">Index</a>
+      <a class="link" href="https://github.com/jprochazk">GitHub</a>
+    </header>
+    <main>
+      <div class="title">
+        <h1 class="heading">{{heading}}</h1>
+        {{#if subheading}}
+        <h3 class="subheading">{{subheading}}</h3>
+        {{/if}}
+        <span class="date">{{date}}</span>
+      </div>
+      <article>{{content}}</article>
+    </main>
+    {{#if refresh}}
+    <script id="dev_refresh">
+      const ws = new WebSocket("ws://localhost:8001");
+      ws.onmessage = ({ data }) => JSON.parse(data)?.type === "refresh" && window.location.reload();
+    </script>
+    {{/if}}
+  </body>
+</html>
