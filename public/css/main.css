@@ -75,6 +75,7 @@ a:visited {
   text-transform: initial !important;
   text-decoration: none;
   border: none;
+  border-radius: 2px;
   padding: 0.5em 1em;
   margin: 0.5em;
 
@@ -129,4 +130,42 @@ article blockquote {
   margin-inline-end: 0;
   padding-left: 1em;
   border-left: 4px solid var(--bg-focus);
+}
+
+main.index {
+  display: flex;
+  justify-content: center;
+}
+
+.posts {
+  margin-top: 2em;
+  width: min(90vw, 640px);
+}
+
+.posts {
+  list-style-type: none;
+}
+
+.posts > li {
+  margin-bottom: 1em;
+  display: flex;
+  align-items: center;
+}
+
+.posts > li > span {
+  color: var(--text-muted);
+}
+
+.posts > li > a {
+  margin-left: 2em;
+  font-size: 1.5em;
+  font-weight: 400;
+  text-decoration: none;
+  padding: 0.5em 1em;
+  border-radius: 2px;
+}
+
+.posts > li > a:hover,
+.posts > li > a:focus {
+  background-color: var(--bg-focus);
 }

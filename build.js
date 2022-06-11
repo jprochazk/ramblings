@@ -14,12 +14,6 @@ import process from "process";
 
 hljsSvelte(hljs);
 
-/**
- * @typedef ParsedFile
- * @property {{ [field: string]: string }} front
- * @property {string} content
- */
-
 /** @param {string} dir */
 export function clean(dir) {
   if (exists(dir)) {
@@ -36,7 +30,7 @@ marked.use({
 
 /**
  * @param {string} input
- * @returns {ParsedFile}
+ * @returns {Record<string, any> & { content: string }}
  */
 export function parse(input) {
   const result = frontMatter(input);
@@ -51,20 +45,25 @@ export function parse(input) {
  * @param {string} markdown
  * @param {string} template
  * @param {{ dev?: boolean | undefined }} options
- * @returns {string}
+ * @returns {{ body: string, context: Record<string, string> }}
  */
 export function transform(markdown, template, options = {}) {
-  return handlebars.compile(template, { noEscape: true })({
+  /** @type {Record<string, any>} */
+  const context = {
     ...parse(markdown),
     refresh: options.dev,
-  });
+  };
+  return {
+    body: handlebars.compile(template, { noEscape: true })(context),
+    context,
+  };
 }
 
 /**
  * @param {string} dir
  * @returns {Promise<string | string[]>}
  */
-export async function getFiles(dir) {
+async function getFiles(dir) {
   const dirents = await fs.readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
     dirents.map((dirent) => {
@@ -73,6 +72,28 @@ export async function getFiles(dir) {
     })
   );
   return Array.prototype.concat(...files);
+}
+
+/**
+ *
+ * @param {string} cwd
+ * @param {Record<string, any>[]} posts
+ */
+async function generateIndex(cwd, posts) {
+  const index = await fs.readFile(path.join(cwd, "public/index.html"), "utf8");
+  const result = handlebars.compile(index, { noEscape: true })({ posts });
+  await fs.writeFile(path.join(cwd, "build", "index.html"), result, "utf8");
+  await fs.writeFile(path.join(cwd, "build/posts", "index.html"), result, "utf8");
+}
+
+const fmt = new Intl.DateTimeFormat("en-US");
+/**
+ * @param {string} date
+ * @returns {string}
+ */
+function formatDate(date) {
+  const [day, month, year] = date.split("-").map((v) => parseInt(v));
+  return fmt.format(Date.UTC(year, month, day));
 }
 
 /**
@@ -99,6 +120,7 @@ export async function build(options = { clean: true }) {
   await fsExtra.copy("posts", "build/posts", { recursive: true });
 
   // generate posts
+  const posts = [];
   const files = await getFiles(path.join(dirs.build, "posts"));
   /** @param {string} file */
   async function handle(file) {
@@ -107,8 +129,15 @@ export async function build(options = { clean: true }) {
 
     const out = path.join(path.dirname(file), path.basename(file, ext) + ".html");
     const content = await fs.readFile(file, "utf8");
-    await fs.writeFile(out, transform(content, template), "utf8");
+    const result = transform(content, template);
+    await fs.writeFile(out, result.body, "utf8");
     await fs.rm(file, { force: true });
+
+    posts.push({
+      heading: result.context.heading,
+      date: formatDate(result.context.date),
+      href: `/posts/${path.basename(path.dirname(file))}`,
+    });
   }
 
   if (Array.isArray(files)) {
@@ -116,6 +145,8 @@ export async function build(options = { clean: true }) {
   } else {
     await handle(files);
   }
+
+  await generateIndex(cwd, posts);
 }
 
 if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {

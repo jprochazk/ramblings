@@ -31,6 +31,15 @@
       <a class="link" href="/">Index</a>
       <a class="link" href="https://github.com/jprochazk">GitHub</a>
     </header>
-    <main>posts</main>
+    <main class="index">
+      <ul class="posts">
+        {{#each posts}}
+        <li>
+          <span>{{date}}</span>
+          <a href="{{href}}">{{heading}}</a>
+        </li>
+        {{/each}}
+      </ul>
+    </main>
   </body>
 </html>

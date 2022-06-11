@@ -1,7 +1,7 @@
 ---
 heading: Why the React VDOM is pure overhead
 subheading: ...and how Svelte can help
-date: 6 June 2022
+date: 12-6-2022
 ---
 
 Frontend developers are expected to create beautiful, rich, accessible, and smooth user experiences. These expectations come with their fair share of issues. The biggest one is complexity: a large web app can be tens or hundreds of thousands of lines of code. Managing this complexity is a huge burden, which is amplified by the nature of the web, being ever-changing and requiring each developer to think a lot about which web browser features they are even allowed to use in order to support the maximum number of users.
