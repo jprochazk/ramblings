@@ -169,3 +169,7 @@ main.index {
 .posts > li > a:focus {
   background-color: var(--bg-focus);
 }
+
+article pre {
+  padding: 1em 2em;
+}
