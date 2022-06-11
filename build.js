@@ -86,16 +86,6 @@ async function generateIndex(cwd, posts) {
   await fs.writeFile(path.join(cwd, "build/posts", "index.html"), result, "utf8");
 }
 
-const fmt = new Intl.DateTimeFormat("en-US");
-/**
- * @param {string} date
- * @returns {string}
- */
-function formatDate(date) {
-  const [day, month, year] = date.split("-").map((v) => parseInt(v));
-  return fmt.format(Date.UTC(year, month, day));
-}
-
 /**
  * @param {{ clean?: boolean | undefined }} options
  */
@@ -135,7 +125,7 @@ export async function build(options = { clean: true }) {
 
     posts.push({
       heading: result.context.heading,
-      date: formatDate(result.context.date),
+      date: result.context.date,
       href: `/posts/${path.basename(path.dirname(file))}`,
     });
   }
